@@ -207,45 +207,17 @@ const rescalePointsInElement = (
       }
     : {};
 
-// This is not computationally ideal, but can't be helped.
 const measureFontSizeFromWH = (
   element: NonDeleted<ExcalidrawTextElement>,
   nextWidth: number,
   nextHeight: number,
-): { size: number; baseline: number } | null => {
-  let scale = Math.min(nextWidth / element.width, nextHeight / element.height);
-  let nextFontSize = element.fontSize * scale;
-  let metrics = measureText(
+): { nextFontSize: number; nextBaseline: number } => {
+  const nextFontSize = (nextWidth / element.width) * element.fontSize;
+  const { baseline: nextBaseline } = measureText(
     element.text,
     getFontString({ fontSize: nextFontSize, fontFamily: element.fontFamily }),
   );
-  if (metrics.width - nextWidth < 1 && metrics.height - nextHeight < 1) {
-    return { size: nextFontSize, baseline: metrics.baseline };
-  }
-  // second measurement
-  scale = Math.min(
-    Math.min(nextWidth, metrics.width) / element.width,
-    Math.min(nextHeight, metrics.height) / element.height,
-  );
-  nextFontSize = element.fontSize * scale;
-  metrics = measureText(
-    element.text,
-    getFontString({ fontSize: nextFontSize, fontFamily: element.fontFamily }),
-  );
-  if (metrics.width - nextWidth < 1 && metrics.height - nextHeight < 1) {
-    return { size: nextFontSize, baseline: metrics.baseline };
-  }
-  // third measurement
-  scale *= 0.99; // just heuristics
-  nextFontSize = element.fontSize * scale;
-  metrics = measureText(
-    element.text,
-    getFontString({ fontSize: nextFontSize, fontFamily: element.fontFamily }),
-  );
-  if (metrics.width - nextWidth < 1 && metrics.height - nextHeight < 1) {
-    return { size: nextFontSize, baseline: metrics.baseline };
-  }
-  return null;
+  return { nextFontSize, nextBaseline };
 };
 
 const getSidesForResizeHandle = (
@@ -316,10 +288,12 @@ const resizeSingleTextElement = (
   if (scale > 0) {
     const nextWidth = element.width * scale;
     const nextHeight = element.height * scale;
-    const nextFont = measureFontSizeFromWH(element, nextWidth, nextHeight);
-    if (nextFont === null) {
-      return;
-    }
+
+    const { nextFontSize, nextBaseline } = measureFontSizeFromWH(
+      element,
+      nextWidth,
+      nextHeight,
+    );
     const [nextX1, nextY1, nextX2, nextY2] = getResizedElementAbsoluteCoords(
       element,
       nextWidth,
@@ -339,11 +313,12 @@ const resizeSingleTextElement = (
       deltaX2,
       deltaY2,
     );
+
     mutateElement(element, {
-      fontSize: nextFont.size,
+      fontSize: nextFontSize,
       width: nextWidth,
       height: nextHeight,
-      baseline: nextFont.baseline,
+      baseline: nextBaseline,
       x: nextElementX,
       y: nextElementY,
     });
@@ -516,11 +491,12 @@ const resizeMultipleElements = (
         const height = element.height * scale;
         let font: { fontSize?: number; baseline?: number } = {};
         if (element.type === "text") {
-          const nextFont = measureFontSizeFromWH(element, width, height);
-          if (nextFont === null) {
-            return null;
-          }
-          font = { fontSize: nextFont.size, baseline: nextFont.baseline };
+          const { nextFontSize, nextBaseline } = measureFontSizeFromWH(
+            element,
+            width,
+            height,
+          );
+          font = { fontSize: nextFontSize, baseline: nextBaseline };
         }
         const origCoords = getElementAbsoluteCoords(element);
         const rescaledPoints = rescalePointsInElement(element, width, height);
